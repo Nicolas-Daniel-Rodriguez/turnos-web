@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Home = () => {
   return (
@@ -12,7 +13,23 @@ const Home = () => {
             <li><a href="/precios" className="text-white">Precios</a></li>
             <li><a href="/contacto" className="text-white">Contacto</a></li>
           </ul>
+          {/* Botón de Login */}
+          <div>
+          <Link to="/login">
+              <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                Login
+              </button>
+            </Link>
+            {/* Botón de Registro */}
+          <Link to="/register">
+              <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                Register
+              </button>
+            </Link>
+            </div>
         </div>
+        
+            
       </nav>
 
       {/* Hero Section with Full-width Image */}
