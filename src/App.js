@@ -4,6 +4,8 @@ import Home from './components/Home';
 import Login from './components/Login'; // Asegúrate de tener el componente Login
 import Register from './components/Register';
 import ProfessionalPage from './components/ProfessionalPage'; // El componente para la página de los profesionales
+import RegisterProfessional from './components/ProfessionalRegisterPage';
+import RegisterPatient from './components/PatientRegisterPage';
 
 function App() {
   return (
@@ -11,6 +13,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/RegisterProfessional" element={<RegisterProfessional />} />
+        <Route path="/RegisterPersonal" element={<RegisterPatient />} />
         <Route path="/register" element={<Register />} />
         {/* Ruta dinámica para profesionales usando el subdominio */}
         <Route path="/:subdomain" element={<ProfessionalPage />} />

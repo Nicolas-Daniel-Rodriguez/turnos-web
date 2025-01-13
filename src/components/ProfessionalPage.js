@@ -1,7 +1,8 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { db } from '../firebaseConfig'; // Firebase config
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig'; // Firebase config
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth'; // Importamos Firebase Auth
 import Calendar from 'react-calendar'; // Calendario interactivo
 import 'react-calendar/dist/Calendar.css'; // Estilos del calendario
 
@@ -12,15 +13,31 @@ const ProfessionalPage = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [turnosVigentes, setTurnosVigentes] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [user, setUser] = useState(null); // Para almacenar el usuario logueado
+  const [errorMessage, setErrorMessage] = useState(""); // Para mostrar el mensaje de error
 
   useEffect(() => {
-    console.log("Subdominio recibido:", subdomain);
+    // Verificar si el usuario está logueado al inicio
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser); // Si está logueado, guardar el usuario
+        setErrorMessage("");  // Limpiar cualquier mensaje de error
+      } else {
+        setUser(null); // Si no está logueado, poner el usuario a null
+        setErrorMessage("Debe estar logueado para reservar un turno."); // Mostrar mensaje de error
+      }
+    });
+
+    // Limpieza del listener cuando el componente se desmonta
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const fetchProfessional = async () => {
       const docRef = doc(db, "professionals", subdomain);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        console.log("Datos del profesional:", docSnap.data());
         setProfessional(docSnap.data());
       } else {
         console.log("No se encontró ningún profesional con ese subdominio.");
@@ -30,11 +47,9 @@ const ProfessionalPage = () => {
     fetchProfessional();
   }, [subdomain]);
 
-  // Función para manejar la selección de fecha del calendario
   const handleDateChange = async (date) => {
     setSelectedDate(date);
 
-    // Obtener los turnos disponibles para el día seleccionado
     const formattedDate = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     const docRef = doc(db, "turnos", formattedDate); // Consulta en Firestore para el día seleccionado
     const docSnap = await getDoc(docRef);
@@ -46,33 +61,63 @@ const ProfessionalPage = () => {
     }
   };
 
-  // Función para manejar la selección de turno
   const handleAppointmentClick = (slot) => {
+    if (!user) {
+      setErrorMessage("Debe estar logueado para reservar un turno.");
+      return;
+    }
+
     setSelectedSlot(slot);
     setShowConfirmation(true);
   };
 
-  // Confirmar la reserva del turno
   const confirmTurno = async () => {
+    if (!user) {
+      setErrorMessage("Debe estar logueado para reservar un turno.");
+      return;
+    }
+
     const formattedDate = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`;
     const docRef = doc(db, "turnos", formattedDate);
 
-    // Actualiza la disponibilidad de los turnos y añade el turno al historial
-    await updateDoc(docRef, {
-      availableSlots: professional.availableSlots.filter((s) => s !== selectedSlot), // Elimina el turno seleccionado
-      bookedAppointments: [
-        ...turnosVigentes,
-        { time: selectedSlot, patient: 'Nombre del paciente' }, // Agrega el turno confirmado
-      ],
-    });
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      await updateDoc(docRef, {
+        availableSlots: professional.availableSlots.filter((s) => s !== selectedSlot), 
+        bookedAppointments: [
+          ...turnosVigentes,
+          { time: selectedSlot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
+        ],
+      });
+    } else {
+      await setDoc(docRef, {
+        availableSlots: professional.availableSlots.filter((s) => s !== selectedSlot),
+        bookedAppointments: [
+          { time: selectedSlot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
+        ],
+      });
+    }
 
     alert(`Turno reservado: ${selectedSlot}`);
     setShowConfirmation(false);
   };
 
-  const cancelTurno = () => {
-    setSelectedSlot(null);
-    setShowConfirmation(false);
+  const cancelTurno = async (turno) => {
+    const formattedDate = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`;
+    const docRef = doc(db, "turnos", formattedDate);
+
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const updatedBookedAppointments = turnosVigentes.filter((t) => t.time !== turno.time);
+      const updatedAvailableSlots = [...professional.availableSlots, turno.time];
+
+      await updateDoc(docRef, {
+        availableSlots: updatedAvailableSlots,
+        bookedAppointments: updatedBookedAppointments,
+      });
+
+      alert(`Turno cancelado: ${turno.time}`);
+    }
   };
 
   return (
@@ -137,6 +182,12 @@ const ProfessionalPage = () => {
                   turnosVigentes.map((turno, index) => (
                     <li key={index} className="p-2 border-b">
                       <span>{turno.time} - {turno.patient}</span>
+                      <button
+                        onClick={() => cancelTurno(turno)}
+                        className="bg-red-500 text-white py-1 px-2 rounded hover:bg-red-600 ml-2"
+                      >
+                        Cancelar
+                      </button>
                     </li>
                   ))
                 ) : (
@@ -147,6 +198,13 @@ const ProfessionalPage = () => {
           </>
         ) : (
           <p>Cargando...</p>
+        )}
+
+        {/* Mostrar el mensaje de error si el usuario no está logueado */}
+        {errorMessage && (
+          <div className="mt-4 p-2 bg-red-500 text-white rounded">
+            {errorMessage}
+          </div>
         )}
       </div>
     </div>
