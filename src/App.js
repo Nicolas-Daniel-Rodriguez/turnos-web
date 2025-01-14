@@ -6,6 +6,7 @@ import Register from './components/Register';
 import ProfessionalPage from './components/ProfessionalPage'; // El componente para la página de los profesionales
 import RegisterProfessional from './components/ProfessionalRegisterPage';
 import RegisterPatient from './components/PatientRegisterPage';
+import "./styleCalendar.css";
 
 function App() {
   return (

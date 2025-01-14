@@ -1,0 +1,32 @@
+/* Estilo personalizado para el calendario */
+.react-calendar {
+    background-color: transparent !important; /* Fondo transparente */
+    box-shadow: none !important; /* Elimina la sombra */
+    border: none !important; /* Elimina los bordes */
+    border-radius: 10px !important; /* Bordes redondeados */
+    color: white;
+  }
+  
+  .react-calendar__tile {
+    border-radius: 5px !important; /* Bordes redondeados en cada celda */
+  }
+  
+  /* Estilo para los días con turnos disponibles */
+  .react-calendar__tile--active {
+    background-color: #4CAF50 !important; /* Fondo verde para el día actual */
+  }
+  
+  .react-calendar__tile--has-turn {
+    background-color: #80e27e !important; /* Fondo verde claro para días con turnos */
+  }
+  
+  /* Estilo para el día actual */
+  .react-calendar__tile--now {
+    background-color: #2196F3 !important; /* Fondo azul para el día actual */
+    color: white !important; /* Texto blanco */
+  }
+  
+  .react-calendar__tile:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important; /* Hover con un color suave */
+  }
+  

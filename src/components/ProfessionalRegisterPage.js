@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db } from '../firebaseConfig'; 
-import { collection, addDoc } from 'firebase/firestore'; 
+import { doc, setDoc, getDoc } from 'firebase/firestore'; 
 import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 const ProfessionalRegisterPage = () => {
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(''); // Se usará como ID de documento
   const [dni, setDni] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +34,14 @@ const ProfessionalRegisterPage = () => {
     if (name && specialty && displayName && dni && email && password) {
       const auth = getAuth();
       try {
+        // Verificar si el subdominio (displayName) ya existe
+        const docRef = doc(db, 'professionals', displayName);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setError('El subdominio ya está en uso. Por favor, elige otro.');
+          return;
+        }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
@@ -43,14 +51,15 @@ const ProfessionalRegisterPage = () => {
         const professional = {
           name,
           specialty,
-          displayName,
+          displayName,  // Esto será también el ID del documento
           dni,
           email,
           role: 'professional',
           uid: user.uid
         };
 
-        await addDoc(collection(db, 'professionals'), professional);
+        // Crear el documento con displayName como ID
+        await setDoc(doc(db, 'professionals', displayName), professional);
 
         // Mostrar notificación estilizada
         toast.success('Profesional registrado con éxito. Por favor verifica tu correo.');
