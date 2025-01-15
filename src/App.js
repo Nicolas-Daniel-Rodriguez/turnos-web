@@ -10,7 +10,7 @@ import "./styleCalendar.css";
 
 function App() {
   return (
-    <Router>
+    <Router basename="/turnos-web">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
