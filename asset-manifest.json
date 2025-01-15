@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/turnos-web/static/css/main.289ebd36.css",
-    "main.js": "/turnos-web/static/js/main.ff123afa.js",
+    "main.js": "/turnos-web/static/js/main.497e9bfe.js",
     "static/js/488.b419f276.chunk.js": "/turnos-web/static/js/488.b419f276.chunk.js",
     "index.html": "/turnos-web/index.html",
     "main.289ebd36.css.map": "/turnos-web/static/css/main.289ebd36.css.map",
-    "main.ff123afa.js.map": "/turnos-web/static/js/main.ff123afa.js.map",
+    "main.497e9bfe.js.map": "/turnos-web/static/js/main.497e9bfe.js.map",
     "488.b419f276.chunk.js.map": "/turnos-web/static/js/488.b419f276.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.289ebd36.css",
-    "static/js/main.ff123afa.js"
+    "static/js/main.497e9bfe.js"
   ]
 }
