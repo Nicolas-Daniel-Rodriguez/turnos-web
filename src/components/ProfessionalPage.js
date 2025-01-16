@@ -1,47 +1,76 @@
-import { useParams } from "react-router-dom";
+import { useParams, useLocation  } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { db, auth } from '../firebaseConfig'; // Firebase config
-import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore'; // Se restauran updateDoc y setDoc
-import { onAuthStateChanged, signOut } from 'firebase/auth'; // Importamos Firebase Auth
+import { db } from '../firebaseConfig'; // Firebase config
+import {  collection, query, where, doc, getDocs, updateDoc, setDoc, getDoc } from 'firebase/firestore'; // Se restauran updateDoc y setDoc
+import { onAuthStateChanged, signOut, getAuth } from 'firebase/auth'; // Importamos Firebase Auth
 import Calendar from 'react-calendar'; // Calendario interactivo
 import 'react-calendar/dist/Calendar.css'; // Estilos del calendario
 
 const ProfessionalPage = () => {
-  const { subdomain } = useParams();
+  const { subdomain } = useParams(); // El subdominio ahora será el displayName
   const [professional, setProfessional] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedSlot, setSelectedSlot] = useState(null);
   const [turnosVigentes, setTurnosVigentes] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [user, setUser] = useState(null); // Para almacenar el usuario logueado
   const [errorMessage, setErrorMessage] = useState(""); // Para mostrar el mensaje de error
+  const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true); // Estado para la carga
+
+  const auth = getAuth();
+  const location = useLocation();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
         setErrorMessage("");
+
+        const currentSubdomain = location.pathname.split('/')[1];  // Obtener el subdominio de la URL (ej. "/displayName")
+
+        // Comparar el displayName del usuario con el subdominio
+        if (currentUser.displayName === currentSubdomain) {
+          setIsOwner(true);  // Si coinciden, es el propietario
+          console.log("El usuario es el propietario de esta página.");
+        } else {
+          setIsOwner(false);  // Si no coinciden, no es el propietario
+          console.log("El usuario no es el propietario de esta página.");
+        }
+
       } else {
         setUser(null);
-        setErrorMessage("Debe estar logueado para reservar un turno.");
+        setErrorMessage("Debe estar logueado para acceder a esta página.");
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth, location]); 
+  
 
   useEffect(() => {
     const fetchProfessional = async () => {
-      const docRef = doc(db, "professionals", subdomain);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        setProfessional(docSnap.data());
-      } else {
-        console.log("No se encontró ningún profesional con ese subdominio.");
+      setLoading(true); // Iniciamos la carga
+      
+      // Creamos una query para buscar en la colección "professionals" donde el displayName coincida con el subdominio
+      const q = query(collection(db, "professionals"), where("displayName", "==", subdomain));
+  
+      try {
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          querySnapshot.forEach((doc) => {
+            setProfessional(doc.data()); // Establecemos los datos del profesional
+          });
+        } else {
+          setErrorMessage("No se encontró ningún profesional con ese subdominio.");
+        }
+      } catch (error) {
+        console.error("Error buscando el profesional:", error);
+        setErrorMessage("Hubo un error al buscar al profesional.");
       }
+      
+      setLoading(false); // Terminamos la carga
     };
-
+  
     fetchProfessional();
   }, [subdomain]);
 
@@ -59,45 +88,30 @@ const ProfessionalPage = () => {
     }
   };
 
-  const handleAppointmentClick = (slot) => {
-    if (!user) {
-      setErrorMessage("Debe estar logueado para reservar un turno.");
-      return;
-    }
-
-    setSelectedSlot(slot);
-    setShowConfirmation(true);
-  };
-
-  const confirmTurno = async () => {
-    if (!user) {
-      setErrorMessage("Debe estar logueado para reservar un turno.");
-      return;
-    }
-
+  const confirmTurno = async (slot) => {
     const formattedDate = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`;
     const docRef = doc(db, "turnos", formattedDate);
     const docSnap = await getDoc(docRef);
-
+  
     if (docSnap.exists()) {
       await updateDoc(docRef, {
-        availableSlots: professional.availableSlots.filter((s) => s !== selectedSlot),
+        availableSlots: professional.availableSlots.filter((s) => s !== slot),
         bookedAppointments: [
           ...turnosVigentes,
-          { time: selectedSlot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
+          { time: slot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
         ],
       });
     } else {
       await setDoc(docRef, {
-        availableSlots: professional.availableSlots.filter((s) => s !== selectedSlot),
+        availableSlots: professional.availableSlots.filter((s) => s !== slot),
         bookedAppointments: [
-          { time: selectedSlot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
+          { time: slot, patient: user.displayName, dni: '12345678', telefono: '123456789', obraSocial: 'Obra Social' },
         ],
       });
     }
-
-    alert(`Turno reservado: ${selectedSlot}`);
-    setShowConfirmation(false);
+  
+    alert(`Turno reservado: ${slot}`);
+    setShowConfirmation(false); // Cierra la ventana de confirmación
   };
 
   const cancelTurno = async (turno) => {
@@ -122,6 +136,10 @@ const ProfessionalPage = () => {
     signOut(auth);
   };
 
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen"><span>Cargando...</span></div>;
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Menú a la izquierda que fue reemplazado por el calendario */}
@@ -139,7 +157,6 @@ const ProfessionalPage = () => {
           }}
           className="react-calendar"  // Esta es la clase principal que se aplica al calendario
         />
-
       </div>
 
       {/* Contenido a la derecha */}
@@ -155,16 +172,30 @@ const ProfessionalPage = () => {
             {/* Menú horizontal y Cerrar sesión */}
             <div className="flex items-center space-x-6">
               <nav className="flex space-x-6">
-                <a href="#" className="text-gray-800 hover:underline">Agenda</a>
-                <a href="#" className="text-gray-800 hover:underline">Clientes</a>
-                <a href="#" className="text-gray-800 hover:underline">Configuración</a>
+                {user && isOwner && (
+                  <>
+                    <a href="#" className="text-gray-800 hover:underline">Agenda</a>
+                    <a href="#" className="text-gray-800 hover:underline">Clientes</a>
+                    <a href="#" className="text-gray-800 hover:underline">Configuración</a>
+                  </>
+                )}
               </nav>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600"
-              >
-                Cerrar Sesión
-              </button>
+
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600"
+                >
+                  Cerrar Sesión
+                </button>
+              ) : (
+                <a
+                  href="/login"
+                  className="bg-blue-500 text-white py-1 px-4 rounded hover:bg-blue-600"
+                >
+                  Iniciar Sesión
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -182,30 +213,39 @@ const ProfessionalPage = () => {
             Turnos del día: {selectedDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </h2>
           <ul>
-            {professional?.availableSlots?.map((slot, index) => {
-              const turnoOcupado = turnosVigentes.find(t => t.time === slot);
-              return (
-                <li key={index} className="flex justify-between items-center mb-2">
-                  <span>{slot}</span>
-                  {turnoOcupado ? (
-                    <button onClick={() => cancelTurno(turnoOcupado)} className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600">Cancelar Turno</button>
-                  ) : (
-                    <button onClick={() => handleAppointmentClick(slot)} className="bg-green-500 text-white py-1 px-4 rounded hover:bg-green-600">Asignar Turno</button>
-                  )}
-                </li>
-              );
-            })}
+            {turnosVigentes.map((turno, index) => (
+              <li key={index} className="flex justify-between mb-2">
+                <div>{turno.time}</div>
+                {isOwner && (
+                  <button
+                    onClick={() => cancelTurno(turno)}
+                    className="bg-red-500 text-white py-1 px-2 rounded hover:bg-red-600"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </li>
+            ))}
           </ul>
         </div>
 
-
-        {/* Confirmación de turno */}
-        {selectedSlot && showConfirmation && (
-          <div className="p-4 border rounded bg-gray-200">
-            <p className="text-lg">¿Estás seguro de reservar el turno para: <strong>{selectedSlot}</strong>?</p>
-            <div className="flex space-x-4 mt-2">
-              <button onClick={confirmTurno} className="bg-green-500 text-white py-1 px-4 rounded hover:bg-green-600">Sí</button>
-              <button onClick={() => setShowConfirmation(false)} className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600">No</button>
+        {/* Confirmación para reservar */}
+        {showConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+            <div className="bg-white p-6 rounded-lg space-y-4">
+              <p className="text-xl">Confirmar turno para: </p>
+              <button
+                onClick={confirmTurno}
+                className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600"
+              >
+                Confirmar
+              </button>
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db } from '../firebaseConfig'; 
-import { doc, setDoc, getDoc } from 'firebase/firestore'; 
+import { query, where, collection, doc, setDoc, getDocs } from 'firebase/firestore'; 
 import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
@@ -25,50 +25,53 @@ const ProfessionalRegisterPage = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
-
+  
     if (!validatePassword(password)) {
       setError('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.');
       return;
     }
-
+  
     if (name && specialty && displayName && dni && email && password) {
       const auth = getAuth();
       try {
-        // Verificar si el subdominio (displayName) ya existe
-        const docRef = doc(db, 'professionals', displayName);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
+        // Verificar si el displayName ya está siendo usado por otro profesional
+        const professionalsRef = collection(db, 'professionals');
+        const q = query(professionalsRef, where('displayName', '==', displayName));
+        const querySnapshot = await getDocs(q);
+  
+        if (!querySnapshot.empty) {
           setError('El subdominio ya está en uso. Por favor, elige otro.');
           return;
         }
-
+  
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-
+  
         // Enviar correo de verificación
         await sendEmailVerification(user);
-
+  
         const professional = {
           name,
           specialty,
-          displayName,  // Esto será también el ID del documento
+          displayName, 
           dni,
           email,
           role: 'professional',
-          uid: user.uid
+          uid: user.uid // Asignamos el uid del usuario al documento
         };
-
-        // Crear el documento con displayName como ID
-        await setDoc(doc(db, 'professionals', displayName), professional);
-
+  
+        // Crear el documento con user.uid como ID
+        await setDoc(doc(db, 'professionals', user.uid), professional);
+  
+  
         // Mostrar notificación estilizada
         toast.success('Profesional registrado con éxito. Por favor verifica tu correo.');
-
+  
         // Redirigir a la página de login después de unos segundos
         setTimeout(() => {
           navigate('/login'); // Cambia '/login' por la ruta de tu página de login
         }, 6000);
-
+  
       } catch (error) {
         if (error.code === 'auth/email-already-in-use') {
           setError('El correo electrónico ya está registrado. Por favor, usa uno diferente o inicia sesión.');

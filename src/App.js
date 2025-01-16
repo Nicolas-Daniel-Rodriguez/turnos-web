@@ -9,8 +9,9 @@ import ProfessionalPage from './components/ProfessionalPage';
 import RegisterProfessional from './components/ProfessionalRegisterPage';
 import RegisterPatient from './components/PatientRegisterPage';
 import { db } from './firebaseConfig'; // Asegúrate de importar Firebase
-import { getDoc, doc } from 'firebase/firestore';
+import { getDocs, query, collection, where } from 'firebase/firestore';
 import "./styleCalendar.css";
+import { AuthProvider } from "./components/AuthContext"; 
 
 // Componente para verificar si el subdominio es válido en Firebase
 const ProfessionalSubdomain = () => {
@@ -23,23 +24,22 @@ const ProfessionalSubdomain = () => {
     const checkSubdomain = async () => {
       setIsLoading(true);
       try {
-        // Busca el documento en la colección "professionals" que coincida con el subdominio
-        const docRef = doc(db, "professionals", subdomain); // El subdominio será el nombre del documento
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
+        // Debes hacer una query para buscar dentro de los documentos por el campo "displayName"
+        const querySnapshot = await getDocs(query(collection(db, "professionals"), where("displayName", "==", subdomain)));
+        
+        if (!querySnapshot.empty) {
           setIsValidSubdomain(true);
         } else {
           setIsValidSubdomain(false);
-          if (!toastShownRef.current) {  // Solo mostrar el toast si no se ha mostrado antes
-            toastShownRef.current = true;  // Marcar que el toast ha sido mostrado
+          if (!toastShownRef.current) {
+            toastShownRef.current = true;
             toast.error(`La página o el profesional "${subdomain}" no existe. Redirigiendo al inicio...`);
           }
         }
       } catch (error) {
         console.error("Error al verificar el subdominio: ", error);
-        if (!toastShownRef.current) {  // Solo mostrar el toast si no se ha mostrado antes
-          toastShownRef.current = true;  // Marcar que el toast ha sido mostrado
+        if (!toastShownRef.current) {
+          toastShownRef.current = true;
           toast.error("Error al verificar el subdominio. Redirigiendo al inicio...");
         }
         setIsValidSubdomain(false);
@@ -47,6 +47,7 @@ const ProfessionalSubdomain = () => {
         setIsLoading(false);
       }
     };
+    
 
     // Llamar a la función de verificación
     checkSubdomain();
@@ -67,6 +68,7 @@ const ProfessionalSubdomain = () => {
 
 function App() {
   return (
+    <AuthProvider>
     <Router>
       <ToastContainer />
       <Routes>
@@ -79,6 +81,7 @@ function App() {
         <Route path="/:subdomain" element={<ProfessionalSubdomain />} />
       </Routes>
     </Router>
+    </AuthProvider>
   );
 }
 

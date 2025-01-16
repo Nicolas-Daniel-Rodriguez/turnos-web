@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth'; // Importa la función desde firebase/auth
+import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from 'firebase/auth'; // Importa setPersistence y browserSessionPersistence
 import { auth } from '../firebaseConfig'; // Asegúrate de que firebaseConfig.js está en la ruta correcta
 
 const Login = () => {
@@ -10,7 +10,12 @@ const Login = () => {
   const handleLogin = (e) => {
     e.preventDefault();
 
-    signInWithEmailAndPassword(auth, email, password) // Utiliza la función correctamente
+    // Establecer la persistencia de sesión
+    setPersistence(auth, browserSessionPersistence) // Cambia la persistencia a la de sesión
+      .then(() => {
+        // Inicia sesión con el email y la contraseña proporcionados
+        return signInWithEmailAndPassword(auth, email, password);
+      })
       .then((userCredential) => {
         const user = userCredential.user;
         console.log('Usuario logueado:', user);
