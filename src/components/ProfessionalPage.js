@@ -1,7 +1,7 @@
-import { useParams, useLocation  } from "react-router-dom";
+import { useParams, useLocation, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { db } from '../firebaseConfig'; // Firebase config
-import {  collection, query, where, doc, getDocs, updateDoc, setDoc, getDoc } from 'firebase/firestore'; // Se restauran updateDoc y setDoc
+import { collection, query, where, doc, getDocs, updateDoc, setDoc, getDoc } from 'firebase/firestore'; // Se restauran updateDoc y setDoc
 import { onAuthStateChanged, signOut, getAuth } from 'firebase/auth'; // Importamos Firebase Auth
 import Calendar from 'react-calendar'; // Calendario interactivo
 import 'react-calendar/dist/Calendar.css'; // Estilos del calendario
@@ -16,6 +16,7 @@ const ProfessionalPage = () => {
   const [errorMessage, setErrorMessage] = useState(""); // Para mostrar el mensaje de error
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true); // Estado para la carga
+  const navigate = useNavigate();
 
   const auth = getAuth();
   const location = useLocation();
@@ -44,16 +45,16 @@ const ProfessionalPage = () => {
     });
 
     return () => unsubscribe();
-  }, [auth, location]); 
-  
+  }, [auth, location]);
+
 
   useEffect(() => {
     const fetchProfessional = async () => {
       setLoading(true); // Iniciamos la carga
-      
+
       // Creamos una query para buscar en la colección "professionals" donde el displayName coincida con el subdominio
       const q = query(collection(db, "professionals"), where("displayName", "==", subdomain));
-  
+
       try {
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -67,10 +68,10 @@ const ProfessionalPage = () => {
         console.error("Error buscando el profesional:", error);
         setErrorMessage("Hubo un error al buscar al profesional.");
       }
-      
+
       setLoading(false); // Terminamos la carga
     };
-  
+
     fetchProfessional();
   }, [subdomain]);
 
@@ -92,7 +93,7 @@ const ProfessionalPage = () => {
     const formattedDate = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1}-${selectedDate.getDate()}`;
     const docRef = doc(db, "turnos", formattedDate);
     const docSnap = await getDoc(docRef);
-  
+
     if (docSnap.exists()) {
       await updateDoc(docRef, {
         availableSlots: professional.availableSlots.filter((s) => s !== slot),
@@ -109,7 +110,7 @@ const ProfessionalPage = () => {
         ],
       });
     }
-  
+
     alert(`Turno reservado: ${slot}`);
     setShowConfirmation(false); // Cierra la ventana de confirmación
   };
@@ -133,7 +134,13 @@ const ProfessionalPage = () => {
   };
 
   const handleLogout = () => {
-    signOut(auth);
+    signOut(auth)
+    .then(() => {
+        navigate("/"); // Redirige después de 2 segundos      
+    })
+    .catch((error) => {
+      console.error("Error al cerrar sesión:", error);
+    });
   };
 
   if (loading) {
@@ -189,12 +196,13 @@ const ProfessionalPage = () => {
                   Cerrar Sesión
                 </button>
               ) : (
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
+                  state={{ from: location }} // Esto almacena la página de origen
                   className="bg-blue-500 text-white py-1 px-4 rounded hover:bg-blue-600"
                 >
                   Iniciar Sesión
-                </a>
+                </Link>
               )}
             </div>
           </div>

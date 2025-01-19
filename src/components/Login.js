@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from 'firebase/auth'; // Importa setPersistence y browserSessionPersistence
 import { auth } from '../firebaseConfig'; // Asegúrate de que firebaseConfig.js está en la ruta correcta
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Obtén la ruta desde donde se solicitó el login o una ruta predeterminada ("/")
+  const from = location.state?.from?.pathname || '/';
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -19,6 +26,9 @@ const Login = () => {
       .then((userCredential) => {
         const user = userCredential.user;
         console.log('Usuario logueado:', user);
+
+        // Redirige a la página desde la cual se solicitó el login
+        navigate(from, { replace: true });
       })
       .catch((err) => {
         setError(err.message);

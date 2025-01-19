@@ -1,7 +1,88 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'; // Importa los métodos de Firebase
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 const Home = () => {
+  const [fadeIn, setFadeIn] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Estado para manejar la autenticación real con Firebase
+  const navigate = useNavigate();
+  const auth = getAuth();
+  const [userType, setUserType] = useState(null);
+
+  useEffect(() => {
+    setFadeIn(true); // Activa el fade cuando el componente se monta
+
+    // Verificar el estado de autenticación con Firebase
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('Usuario autenticado:', user); // Verificar los datos del usuario
+  
+        setIsAuthenticated(true);
+  
+        // Verificar el tipo de usuario antes de hacer la consulta
+        const db = getFirestore();
+        
+        // Buscar el usuario en la colección 'professionals' o 'patients' según el uid
+        const userRef = doc(db, 'professionals', user.uid); // Comienza buscando en 'professionals'
+        const patientRef = doc(db, 'patients', user.uid); // Luego en 'patients'
+
+        // Primero intentar obtener datos de los profesionales
+        getDoc(userRef).then((docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setUserType(userData.role); // Obtienes el 'role' del usuario
+          } else {
+            console.log("No se encontró el documento para el profesional, intentamos con los pacientes.");
+            // Si no es un profesional, intenta con los pacientes
+            getDoc(patientRef).then((patientSnap) => {
+              if (patientSnap.exists()) {
+                const patientData = patientSnap.data();
+                setUserType(patientData.role); // Obtienes el 'role' del paciente
+              } else {
+                console.log("No se encontró el documento para el paciente");
+                setUserType(null);
+              }
+            }).catch((error) => {
+              console.error("Error obteniendo los datos del paciente:", error);
+              setUserType(null);
+            });
+          }
+        }).catch((error) => {
+          console.error("Error obteniendo los datos del profesional:", error);
+          setUserType(null);
+        });
+
+      } else {
+        setIsAuthenticated(false);
+        setUserType(null);
+        console.log('Usuario no autenticado');
+      }
+    });
+  }, [auth]);
+
+  const handleLogout = () => {
+    signOut(auth)
+      .then(() => {
+        setIsAuthenticated(false); // Cerrar sesión correctamente
+        navigate('/'); // Redirigir al home después de cerrar sesión
+      })
+      .catch((error) => {
+        console.error('Error al cerrar sesión:', error);
+      });
+  };
+
+  const goToDashboard = () => {
+    console.log('Tipo de usuario:', userType); // Verifica qué tipo de usuario es
+    if (userType === 'professional') {
+      navigate(`/${auth.currentUser.displayName}`); // Redirigir al dashboard del profesional
+    } else if (userType === 'particular') {
+      navigate('/turnos'); // Redirigir a la página de turnos del paciente
+    } else {
+      console.log('No se ha encontrado el tipo de usuario');
+    }
+  };
+
   return (
     <>
       {/* Navbar */}
@@ -13,27 +94,45 @@ const Home = () => {
             <li><a href="/precios" className="text-white">Precios</a></li>
             <li><a href="/contacto" className="text-white">Contacto</a></li>
           </ul>
-          {/* Botón de Login */}
+
+          {/* Mostrar los botones dependiendo del estado de autenticación */}
           <div>
-          <Link to="/login">
-              <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
-                Login
-              </button>
-            </Link>
-            {/* Botón de Registro */}
-          <Link to="/register">
-              <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
-                Register
-              </button>
-            </Link>
-            </div>
+            {isAuthenticated ? (
+              <>
+                {/* Link a Dashboard */}
+                <button onClick={goToDashboard} className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                  Dashboard
+                </button>
+                {/* Botón de Cerrar Sesión */}
+                <button
+                  onClick={handleLogout}
+                  className="ml-4 bg-red-500 text-white py-2 px-4 rounded"
+                >
+                  Cerrar Sesión
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Botón de Login */}
+                <Link to="/login">
+                  <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                    Login
+                  </button>
+                </Link>
+                {/* Botón de Registro */}
+                <Link to="/register">
+                  <button className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                    Register
+                  </button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
-        
-            
       </nav>
 
       {/* Hero Section with Full-width Image */}
-      <div className="relative">
+      <div className={`relative ${fadeIn ? 'fade-in' : ''}`}>
         <img
           src="https://via.placeholder.com/1920x800" // Cambia esta URL por la imagen que desees
           alt="Hero"
