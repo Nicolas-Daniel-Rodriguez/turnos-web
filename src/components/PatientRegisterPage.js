@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db } from '../firebaseConfig'; 
-import { collection, addDoc } from 'firebase/firestore'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
@@ -50,7 +50,7 @@ const PatientRegisterPage = () => {
           uid: user.uid,
         };
 
-        await addDoc(collection(db, 'patients'), patient);
+        await setDoc(doc(db, 'patients', user.uid), patient);
 
         // Mostrar notificación estilizada
         toast.success('Paciente registrado con éxito. Por favor verifica tu correo.');

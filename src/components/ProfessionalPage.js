@@ -9,6 +9,7 @@ import 'react-calendar/dist/Calendar.css'; // Estilos del calendario
 const ProfessionalPage = () => {
   const { subdomain } = useParams(); // El subdominio ahora será el displayName
   const [professional, setProfessional] = useState(null);
+  const [patient, setPatient] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [turnosVigentes, setTurnosVigentes] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -50,30 +51,48 @@ const ProfessionalPage = () => {
 
   useEffect(() => {
     const fetchProfessional = async () => {
+      if (!user || !user.uid) {
+        return; // Si el usuario no está logueado, no realizamos la búsqueda
+      }
+
       setLoading(true); // Iniciamos la carga
 
-      // Creamos una query para buscar en la colección "professionals" donde el displayName coincida con el subdominio
-      const q = query(collection(db, "professionals"), where("displayName", "==", subdomain));
+      // Primero buscamos al profesional usando el subdominio
+      const qProfessional = query(collection(db, "professionals"), where("displayName", "==", subdomain));
+      // Buscamos al paciente usando el UID
+      const qPatient = query(collection(db, "patients"), where("uid", "==", user.uid));
 
       try {
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          querySnapshot.forEach((doc) => {
-            setProfessional(doc.data()); // Establecemos los datos del profesional
+        const professionalSnapshot = await getDocs(qProfessional);
+        const patientSnapshot = await getDocs(qPatient);
+
+        // Si encontramos al profesional, cargamos sus datos
+        if (!professionalSnapshot.empty) {
+          professionalSnapshot.forEach((doc) => {
+            setProfessional(doc.data());
           });
         } else {
           setErrorMessage("No se encontró ningún profesional con ese subdominio.");
         }
+
+        // Si encontramos al paciente, cargamos sus datos
+        if (!patientSnapshot.empty) {
+          patientSnapshot.forEach((doc) => {
+            setPatient(doc.data());
+          });
+        } else {
+          setErrorMessage("No se encontró el paciente con ese UID.");
+        }
       } catch (error) {
-        console.error("Error buscando el profesional:", error);
-        setErrorMessage("Hubo un error al buscar al profesional.");
+        console.error("Error buscando el profesional o paciente:", error);
+        setErrorMessage("Hubo un error al buscar al profesional o paciente.");
       }
 
       setLoading(false); // Terminamos la carga
     };
 
     fetchProfessional();
-  }, [subdomain]);
+  }, [subdomain, user]);
 
   const handleDateChange = async (date) => {
     setSelectedDate(date);
@@ -135,17 +154,37 @@ const ProfessionalPage = () => {
 
   const handleLogout = () => {
     signOut(auth)
-    .then(() => {
+      .then(() => {
         navigate("/"); // Redirige después de 2 segundos      
-    })
-    .catch((error) => {
-      console.error("Error al cerrar sesión:", error);
-    });
+      })
+      .catch((error) => {
+        console.error("Error al cerrar sesión:", error);
+      });
   };
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><span>Cargando...</span></div>;
   }
+
+  const SessionButton = ({ user, handleLogout, location }) => {
+    return user ? (
+      <button
+        onClick={handleLogout}
+        className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600"
+      >
+        Cerrar Sesión
+      </button>
+    ) : (
+      <Link
+        to="/login"
+        state={{ from: location }} // Esto almacena la página de origen
+        className="bg-blue-500 text-white py-1 px-4 rounded hover:bg-blue-600"
+      >
+        Iniciar Sesión
+      </Link>
+    );
+  };
+
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -168,45 +207,77 @@ const ProfessionalPage = () => {
 
       {/* Contenido a la derecha */}
       <div className="w-3/4 p-6 space-y-6">
-        {professional && (
-          <div className="flex justify-between items-center">
-            {/* Nombre del profesional */}
-            <div>
-              <p className="text-gray-800 text-lg font-semibold">{professional.name}</p>
-              <p>{professional.specialty}</p>
+        {professional && isOwner && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              {/* Nombre del profesional */}
+              <div>
+                <p className="text-gray-800 text-lg font-semibold">{professional.name}</p>
+                <p>{professional.specialty}</p>
+              </div>
+
+              {/* Menú horizontal y Cerrar sesión */}
+              <div className="flex items-center space-x-6">
+                <nav className="flex space-x-6">
+                  <a href="/Home" className="text-gray-800 hover:underline">Agenda</a>
+                  <a href="/Home" className="text-gray-800 hover:underline">Clientes</a>
+                  <a href="/Home" className="text-gray-800 hover:underline">Configuración</a>
+                </nav>
+                <SessionButton user={user} handleLogout={handleLogout} location={location} />
+              </div>
+
             </div>
 
-            {/* Menú horizontal y Cerrar sesión */}
-            <div className="flex items-center space-x-6">
-              <nav className="flex space-x-6">
-                {user && isOwner && (
-                  <>
-                    <a href="#" className="text-gray-800 hover:underline">Agenda</a>
-                    <a href="#" className="text-gray-800 hover:underline">Clientes</a>
-                    <a href="#" className="text-gray-800 hover:underline">Configuración</a>
-                  </>
-                )}
-              </nav>
-
-              {user ? (
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-500 text-white py-1 px-4 rounded hover:bg-red-600"
-                >
-                  Cerrar Sesión
-                </button>
-              ) : (
-                <Link
-                  to="/login"
-                  state={{ from: location }} // Esto almacena la página de origen
-                  className="bg-blue-500 text-white py-1 px-4 rounded hover:bg-blue-600"
-                >
-                  Iniciar Sesión
-                </Link>
-              )}
+            {/* Turnos del día */}
+            <div className="bg-white p-4 shadow-lg rounded-lg">
+              <h2 className="text-xl mb-4">
+                Turnos del día: {selectedDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </h2>
+              <ul>
+                {turnosVigentes.map((turno, index) => (
+                  <li key={index} className="flex justify-between mb-2">
+                    <div>{turno.time}</div>
+                    {isOwner && (
+                      <button
+                        onClick={() => cancelTurno(turno)}
+                        className="bg-red-500 text-white py-1 px-2 rounded hover:bg-red-600"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
+
+
         )}
+
+        {patient && !isOwner && (
+          <div>
+             <div className="flex justify-between items-center mb-6">
+            <div>
+              <p className="text-gray-800 text-lg font-semibold">{patient.name}</p>
+              <p>DNI: {patient.dni}</p>
+            </div>
+            <div className="flex items-center space-x-6">
+              <nav className="flex space-x-6">
+                <Link to="/Home" className="text-gray-800 hover:underline">Mis Datos</Link>
+                <Link to="/Home" className="text-gray-800 hover:underline">Historial de turnos</Link>
+                <Link to="/Home" className="text-gray-800 hover:underline">Configuración</Link>
+              </nav>
+              <SessionButton user={user} handleLogout={handleLogout} location={location} />
+            </div>
+          </div>
+            {/* Selector de turnos */}
+            <div className="bg-white p-4 shadow-lg rounded-lg">
+              
+              </div>
+          </div>
+        )}
+
+
 
         {/* Mostrar mensaje de error si existe */}
         {errorMessage && (
@@ -215,27 +286,7 @@ const ProfessionalPage = () => {
           </div>
         )}
 
-        {/* Turnos del día */}
-        <div className="bg-white p-4 shadow-lg rounded-lg">
-          <h2 className="text-xl mb-4">
-            Turnos del día: {selectedDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </h2>
-          <ul>
-            {turnosVigentes.map((turno, index) => (
-              <li key={index} className="flex justify-between mb-2">
-                <div>{turno.time}</div>
-                {isOwner && (
-                  <button
-                    onClick={() => cancelTurno(turno)}
-                    className="bg-red-500 text-white py-1 px-2 rounded hover:bg-red-600"
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+
 
         {/* Confirmación para reservar */}
         {showConfirmation && (

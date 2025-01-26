@@ -8,7 +8,7 @@ const Register = () => {
   };
 
   const goToPersonRegister = () => {
-    navigate('/RegisterPersonal'); // Redirige a la página de registro de personas
+    navigate('/RegisterPatient'); // Redirige a la página de registro de personas
   };
 
   return (

@@ -17,12 +17,12 @@ const Home = () => {
     onAuthStateChanged(auth, (user) => {
       if (user) {
         console.log('Usuario autenticado:', user); // Verificar los datos del usuario
-  
+
         setIsAuthenticated(true);
-  
+
         // Verificar el tipo de usuario antes de hacer la consulta
         const db = getFirestore();
-        
+
         // Buscar el usuario en la colección 'professionals' o 'patients' según el uid
         const userRef = doc(db, 'professionals', user.uid); // Comienza buscando en 'professionals'
         const patientRef = doc(db, 'patients', user.uid); // Luego en 'patients'
@@ -31,6 +31,7 @@ const Home = () => {
         getDoc(userRef).then((docSnap) => {
           if (docSnap.exists()) {
             const userData = docSnap.data();
+            console.log('Datos del profesional:', userData); // Verifica los datos
             setUserType(userData.role); // Obtienes el 'role' del usuario
           } else {
             console.log("No se encontró el documento para el profesional, intentamos con los pacientes.");
@@ -38,24 +39,25 @@ const Home = () => {
             getDoc(patientRef).then((patientSnap) => {
               if (patientSnap.exists()) {
                 const patientData = patientSnap.data();
+                console.log('Datos del paciente:', patientData); // Verifica los datos
                 setUserType(patientData.role); // Obtienes el 'role' del paciente
               } else {
                 console.log("No se encontró el documento para el paciente");
-                setUserType(null);
+                setUserType('guest'); // Aquí asignamos un valor predeterminado si no se encuentra el tipo de usuario
               }
             }).catch((error) => {
               console.error("Error obteniendo los datos del paciente:", error);
-              setUserType(null);
+              setUserType('guest'); // Valor por defecto para errores
             });
           }
         }).catch((error) => {
           console.error("Error obteniendo los datos del profesional:", error);
-          setUserType(null);
+          setUserType('guest'); // Valor por defecto para errores
         });
 
       } else {
         setIsAuthenticated(false);
-        setUserType(null);
+        setUserType('guest'); // Asegúrate de asignar un valor por defecto cuando el usuario no está autenticado
         console.log('Usuario no autenticado');
       }
     });
@@ -77,7 +79,7 @@ const Home = () => {
     if (userType === 'professional') {
       navigate(`/${auth.currentUser.displayName}`); // Redirigir al dashboard del profesional
     } else if (userType === 'particular') {
-      navigate('/turnos'); // Redirigir a la página de turnos del paciente
+      
     } else {
       console.log('No se ha encontrado el tipo de usuario');
     }
@@ -100,9 +102,12 @@ const Home = () => {
             {isAuthenticated ? (
               <>
                 {/* Link a Dashboard */}
-                <button onClick={goToDashboard} className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
-                  Dashboard
-                </button>
+                {userType === 'professional' && (
+                  <button onClick={goToDashboard} className="ml-4 bg-blue-500 text-white py-2 px-4 rounded">
+                    Dashboard
+                  </button>
+                )}   
+
                 {/* Botón de Cerrar Sesión */}
                 <button
                   onClick={handleLogout}
